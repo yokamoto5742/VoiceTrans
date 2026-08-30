@@ -40,7 +40,7 @@ Pause キー で録音開始/終了 、文字起こし結果をアクティブ�
 
 VoiceTrans はこれらを次の組み合わせで解決します。
 
-- **Google Cloud Speech-to-Text API** による高い日本語認識精度
+- **Gemini 3.5 Transcribe** による高い日本語認識精度
 - **Win32 SendInput** による貼り付け先非依存の入力
 - **ローカル WAV 保存** による通信瞬断への耐性（F8 キーで再送可能）
 
@@ -75,24 +75,24 @@ VoiceTrans はこれらを次の組み合わせで解決します。
 
 ## 専門用語登録機能
 
-`data/technical_terms.txt` に専門用語を登録すると、Google Cloud Speech-to-Text API にフレーズヒントとして送信され、認識精度が向上します。
+`data/technical_terms.txt` に専門用語を登録すると、Gemini API へカスタム語彙として送信され、認識精度が向上します。
 
 ### 登録方法
 
 `data/technical_terms.txt` に 1 行 1 フレーズで登録します。
 
 ```
-$OOV_CLASS_DIGIT_SEQUENCE
-$OPERAND
 加齢黄斑変性
+硝子体注射
 ```
 
-- **クラストークン** (`$OOV_CLASS_*`) — Google STT API の特殊トークン。数字列や演算子など、クラスベースの認識ヒント
-- **テキストフレーズ** — 医療用語や業界用語など、固有の専門用語
+医療用語や業界用語など、一般的でない固有の専門用語のみを登録してください。日常語を登録すると逆効果になります。登録は最大 1000 語ですが、100 語程度までが最も効果的です。
+
+> **旧バージョンからの移行:** Google STT 時代のクラストークン (`$OOV_CLASS_DIGIT_SEQUENCE`、`$OPERAND` など) は Gemini では機能しないため、読み込み時に自動で除外されます。
 
 ### 実装動作
 
-アプリケーション起動時に `data/technical_terms.txt` を読み込み、STT API へ `speech_recognition_hints` として設定されます。これにより以下のような効果が期待できます。
+アプリケーション起動時に `data/technical_terms.txt` を読み込み、Gemini API へ `custom_vocabulary` として設定されます。これにより以下のような効果が期待できます。
 
 - 医療系の専門用語（「加齢黄斑変性」など）の誤認識を削減
 - 部署名や業務用語の正確な認識
@@ -148,29 +148,19 @@ uv sync
 source .venv/bin/activate
 ```
 
-### 3. Google Cloud API キーを設定
+### 3. Gemini API キーを設定
 
-`.env` の`GOOGLE_CREDENTIALS_JSON` の値には、Google Cloud Console からダウンロードしたサービスアカウントキーの JSON を**1 行に変換した文字列**が必要です。
+#### 3-1. API キーを取得
 
-#### 3-1. サービスアカウントキーを 1 行に変換
-
-Google Cloud Console からダウンロードした JSON ファイルには改行が含まれているため、`scripts/json_minifier.py` を使って 1 行に変換します。
-
-```bash
-python scripts/json_minifier.py
-```
-
-実行するとファイル選択ダイアログが開きます。Google Cloud のサービスアカウントキー JSON ファイルを選択してください。
-
-スクリプトは変換後の 1 行 JSON をタイムスタンプ付きで出力ファイル（例: `credentials_20240430_123456.json`）に保存します。出力ファイル内の JSON 文字列をコピーしてください。
+[Google AI Studio](https://aistudio.google.com/apikey) で API キーを発行します。
 
 #### 3-2. .env ファイルを作成
 
 ```
-GOOGLE_PROJECT_ID=my-awesome-app-123456
-GOOGLE_LOCATION=asia-northeast1
-GOOGLE_CREDENTIALS_JSON={"type":"service_account","project_id":"my-awesome-app-123456","private_key_id":...}
+GEMINI_API_KEY=AIza...
 ```
+
+`.env` は初回起動時に `%APPDATA%\VoiceTrans\.env` へコピーされ、以降はそちらが優先して読み込まれます。既存ユーザーがバージョンアップする場合は、`%APPDATA%\VoiceTrans\.env` を直接書き換えてください（旧 `GOOGLE_PROJECT_ID` / `GOOGLE_LOCATION` / `GOOGLE_CREDENTIALS_JSON` は不要です）。
 
 ### 4. 起動
 
@@ -214,7 +204,7 @@ python main.py
 
 - **`app/`** — Tkinter UI レイヤー。`VoiceInputManager` がメインウィンドウを保持。全 UI 更新は `UIQueueProcessor` 経由
 - **`service/`** — ビジネスロジック。`RecordingLifecycle` が `AudioRecorder` → `AudioFileManager` → `TranscriptionHandler` → `TextTransformer` → `ClipboardManager` → `paste_backend` のパイプラインを統合
-- **`external_service/`** — Google Cloud API の薄いラッパー
+- **`external_service/`** — Gemini API の薄いラッパー
 - **`utils/`** — 設定 (`AppConfig`)、ロギング、クラッシュログ、シグナル設定
 
 <div align="right"><a href="#目次">▲ 目次へ戻る</a></div>
@@ -227,10 +217,19 @@ python main.py
 
 | セクション | 用途 |
 |-----------|------|
-| `[GOOGLE_STT]` | モデル (`chirp_3`)、言語 (`ja-JP`)、専門用語フレーズセット |
+| `[GEMINI]` | モデル (`gemini-3.5-transcribe`)、言語 (`ja-JP`)、文字起こしモード、カスタム語彙ファイル |
 | `[KEYS]` | ショートカット割り当て (Pause: 録音、F8: 再変換、F9: 句読点切替、Esc: 終了) |
 | `[RECORDING]` | 自動停止タイマー（デフォルト 60 秒） |
 | `[PATHS]` | 置換ルールファイル、一時ファイル保存先 |
+
+### 文字起こしモード (`[GEMINI] mode`)
+
+| 値 | 動作 |
+|---|---|
+| `verbatim` (デフォルト) | 発話どおりに書き起こす。フィラーや言い直しもそのまま残る |
+| `smart` | フィラー除去、言い直しの解決、箇条書き・日付・金額の自動整形を行う |
+
+`smart` はモデル側が文章を再構成するため、F9 の句読点トグルや `data/replacements.txt` の置換ルールが想定どおりに効かない場合があります。短文入力用途では `verbatim` を推奨します。
 
 その他のセクションは `config.ini` 内を参照してください。
 
@@ -250,7 +249,7 @@ python -m pytest tests/ -v --tb=short --cov=app --cov-report=html
 ### 型チェック
 
 ```bash
-pyright app service utils
+pyright app external_service service utils
 ```
 
 ### 実行ファイルのビルド
@@ -286,7 +285,7 @@ python build.py
 - Windows 11
 - Python 3.12 以上
 - マイク入力デバイス
-- Google Cloud の credentials.json 
+- Gemini API キー
 
 <div align="right"><a href="#目次">▲ 目次へ戻る</a></div>
 
@@ -294,9 +293,9 @@ python build.py
 
 ## 使用料金について
 
-本ツールは **Google Cloud Speech-to-Text API** を使用するため、API の利用に応じた使用料金が発生します。
+本ツールは **Gemini API (`gemini-3.5-transcribe`)** を使用するため、API の利用に応じた使用料金が発生します。
 
-- Speech-to-Text V2 API 標準認識モデルの使用料金の詳細は [Google Cloud の公式サイト](https://cloud.google.com/speech-to-text/pricing) にてご確認ください。
+- 使用料金の詳細は [Gemini API の料金ページ](https://ai.google.dev/gemini-api/docs/pricing) にてご確認ください。
 
 <div align="right"><a href="#目次">▲ 目次へ戻る</a></div>
 
@@ -306,8 +305,8 @@ python build.py
 
 ### API キーエラーが表示される
 
-- `.env`に`GOOGLE_CREDENTIALS_JSON` が正しく設定されているか確認
-- Google Cloud ダッシュボードで認証情報が有効かどうかを確認
+- `%APPDATA%\VoiceTrans\.env` に `GEMINI_API_KEY` が正しく設定されているか確認
+- [Google AI Studio](https://aistudio.google.com/apikey) で API キーが有効かどうかを確認
 
 ### 音声が録音されない
 
@@ -333,11 +332,11 @@ python build.py
 更新履歴は [CHANGELOG.md](docs/CHANGELOG.md) を参照してください。
 
 ## 免責事項
-Google Cloud Speech-to-Textをご利用の際は、個人を特定できる医療情報は入力しないでください。 
+Gemini API をご利用の際は、個人を特定できる医療情報は入力しないでください。
 
-本ツールは、Google Cloud Speech-to-Textを通じた音声データの取り扱いに起因するいかなる損害についても、責任を負いかねます。
+本ツールは、Gemini API を通じた音声データの取り扱いに起因するいかなる損害についても、責任を負いかねます。
 
-詳細は、Google Cloudの公式サイトにてプライバシーポリシーおよび利用規約をご確認ください。
+詳細は、Google の公式サイトにてプライバシーポリシーおよび利用規約をご確認ください。
 
 <div align="right"><a href="#目次">▲ 目次へ戻る</a></div>
 "# VoiceTrans" 

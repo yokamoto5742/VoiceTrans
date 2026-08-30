@@ -1,4 +1,5 @@
 import configparser
+import logging
 import os
 import sys
 
@@ -60,36 +61,37 @@ class AppConfig:
     def paste_delay(self) -> float:
         return get_config_value(self._config, 'CLIPBOARD', 'PASTE_DELAY', 0.3)
 
-    # --- GOOGLE_STT ---
+    # --- GEMINI ---
     @property
-    def google_stt_model(self) -> str:
-        return get_config_value(self._config, 'GOOGLE_STT', 'MODEL', 'chirp_3')
+    def gemini_model(self) -> str:
+        return get_config_value(self._config, 'GEMINI', 'MODEL', 'gemini-3.5-transcribe')
 
     @property
-    def google_stt_language(self) -> list[str]:
-        """認識対象の言語コード一覧。カンマ区切りで複数指定可"""
-        raw = get_config_value(self._config, 'GOOGLE_STT', 'LANGUAGE', 'ja-JP,en-US')
+    def gemini_language_codes(self) -> list[str]:
+        """認識対象のBCP-47言語コード一覧。カンマ区切りで複数指定可"""
+        raw = get_config_value(self._config, 'GEMINI', 'LANGUAGE_CODES', 'ja-JP')
         codes = [code.strip() for code in str(raw).split(',') if code.strip()]
-        return codes if codes else ['ja-JP', 'en-US']
+        return codes if codes else ['ja-JP']
 
     @property
-    def google_stt_phrase_set_file(self) -> str:
+    def gemini_mode(self) -> str:
+        """文字起こしモード。verbatim(発話どおり)かsmart(整形あり)"""
+        raw = get_config_value(self._config, 'GEMINI', 'MODE', 'verbatim')
+        mode = str(raw).strip().lower()
+        if mode not in ('verbatim', 'smart'):
+            logging.warning(f'不正なmode設定のためverbatimを使用します: {raw}')
+            return 'verbatim'
+        return mode
+
+    @property
+    def gemini_custom_vocabulary_file(self) -> str:
         """専門用語ファイル名。空文字なら無効"""
-        configured = get_config_value(self._config, 'GOOGLE_STT', 'PHRASE_SET_FILE', '')
+        configured = get_config_value(self._config, 'GEMINI', 'CUSTOM_VOCABULARY_FILE', '')
         if not configured:
             return ''
         if os.path.isabs(configured):
             return configured
         return os.path.join(self._default_data_dir(), configured)
-
-    @property
-    def google_stt_phrase_boost(self) -> float:
-        return get_config_value(self._config, 'GOOGLE_STT', 'PHRASE_BOOST', 10.0)
-
-    @property
-    def google_stt_enable_automatic_punctuation(self) -> bool:
-        """Google STT に句読点を自動挿入させるか"""
-        return get_config_value(self._config, 'GOOGLE_STT', 'ENABLE_AUTOMATIC_PUNCTUATION', False)
 
     def _default_data_dir(self) -> str:
         if getattr(sys, 'frozen', False):

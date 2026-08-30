@@ -4,7 +4,7 @@ import traceback
 from typing import Any, Callable, List, Optional
 
 from app.ui_queue_processor import UIQueueProcessor
-from external_service.google_stt_api import transcribe_audio, transcribe_pcm
+from external_service.gemini_transcribe_api import transcribe_audio, transcribe_pcm
 from service.audio_file_manager import AudioFileManager
 from service.text_transformer import process_punctuation
 from utils.app_config import AppConfig

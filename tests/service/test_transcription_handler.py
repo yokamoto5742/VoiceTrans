@@ -9,7 +9,7 @@ from tests.conftest import dict_to_app_config
 def _make_handler(use_punctuation: bool = False, config_dict: dict | None = None):
     if config_dict is None:
         config_dict = {
-            'GOOGLE_STT': {'MODEL': 'chirp_3', 'LANGUAGE': 'ja-JP'},
+            'GEMINI': {'MODEL': 'gemini-3.5-transcribe', 'LANGUAGE_CODES': 'ja-JP'},
             'PATHS': {'TEMP_DIR': '/test/temp'}
         }
     config = dict_to_app_config(config_dict)

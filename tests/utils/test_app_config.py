@@ -1,3 +1,4 @@
+import os
 from unittest.mock import patch
 
 from tests.conftest import dict_to_app_config
@@ -125,25 +126,62 @@ class TestAppConfigRecording:
         assert config.auto_stop_timer == 120
 
 
-class TestAppConfigGoogleStt:
-    """Google STT設定プロパティのテストクラス"""
+class TestAppConfigGemini:
+    """Gemini設定プロパティのテストクラス"""
 
-    def test_google_stt_defaults(self):
+    def test_gemini_defaults(self):
         """正常系: デフォルト値"""
         config = dict_to_app_config({})
-        assert config.google_stt_model == 'chirp_3'
-        assert config.google_stt_language == ['ja-JP', 'en-US']
+        assert config.gemini_model == 'gemini-3.5-transcribe'
+        assert config.gemini_language_codes == ['ja-JP']
+        assert config.gemini_mode == 'verbatim'
+        assert config.gemini_custom_vocabulary_file == ''
 
-    def test_google_stt_custom(self):
+    def test_gemini_custom(self):
         """正常系: カスタム値"""
-        config = dict_to_app_config({'GOOGLE_STT': {'MODEL': 'chirp_2', 'LANGUAGE': 'en-US'}})
-        assert config.google_stt_model == 'chirp_2'
-        assert config.google_stt_language == ['en-US']
+        config = dict_to_app_config({
+            'GEMINI': {'MODEL': 'gemini-3.5-transcribe-live', 'LANGUAGE_CODES': 'en-US'}
+        })
+        assert config.gemini_model == 'gemini-3.5-transcribe-live'
+        assert config.gemini_language_codes == ['en-US']
 
-    def test_google_stt_multiple_languages(self):
+    def test_gemini_multiple_languages(self):
         """正常系: カンマ区切りで複数言語"""
-        config = dict_to_app_config({'GOOGLE_STT': {'LANGUAGE': 'ja-JP, en-US'}})
-        assert config.google_stt_language == ['ja-JP', 'en-US']
+        config = dict_to_app_config({'GEMINI': {'LANGUAGE_CODES': 'ja-JP, en-US'}})
+        assert config.gemini_language_codes == ['ja-JP', 'en-US']
+
+    def test_gemini_language_codes_empty_falls_back(self):
+        """異常系: 空指定ならデフォルトのja-JPを使う"""
+        config = dict_to_app_config({'GEMINI': {'LANGUAGE_CODES': ' , '}})
+        assert config.gemini_language_codes == ['ja-JP']
+
+    def test_gemini_mode_smart(self):
+        """正常系: smartモードを指定"""
+        config = dict_to_app_config({'GEMINI': {'MODE': 'smart'}})
+        assert config.gemini_mode == 'smart'
+
+    def test_gemini_mode_normalizes_case(self):
+        """正常系: 大文字や前後空白を正規化する"""
+        config = dict_to_app_config({'GEMINI': {'MODE': ' Smart '}})
+        assert config.gemini_mode == 'smart'
+
+    def test_gemini_mode_invalid_falls_back(self):
+        """異常系: 不正なmodeはverbatimにフォールバック"""
+        config = dict_to_app_config({'GEMINI': {'MODE': 'fancy'}})
+        assert config.gemini_mode == 'verbatim'
+
+    def test_gemini_custom_vocabulary_file_resolved_from_data_dir(self):
+        """正常系: 相対パスはdataディレクトリから解決"""
+        config = dict_to_app_config({'GEMINI': {'CUSTOM_VOCABULARY_FILE': 'technical_terms.txt'}})
+        resolved = config.gemini_custom_vocabulary_file
+        assert os.path.isabs(resolved)
+        assert resolved.endswith('technical_terms.txt')
+
+    def test_gemini_custom_vocabulary_file_absolute_kept(self, tmp_path):
+        """正常系: 絶対パスはそのまま返す"""
+        absolute = str(tmp_path / 'terms.txt')
+        config = dict_to_app_config({'GEMINI': {'CUSTOM_VOCABULARY_FILE': absolute}})
+        assert config.gemini_custom_vocabulary_file == absolute
 
 
 class TestAppConfigRawConfig:

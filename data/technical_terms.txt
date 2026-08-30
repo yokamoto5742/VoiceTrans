@@ -1,7 +1,3 @@
-$OOV_CLASS_DIGIT_SEQUENCE
-$OPERAND
-$PERCENT
-$TIME
 加齢黄斑変性
 医療秘書課
 視能訓練科

@@ -15,7 +15,7 @@ python -m pytest tests/ -v --tb=short
 python -m pytest tests/ -v --tb=short --cov=app --cov-report=html
 
 # Type check
-pyright app service utils
+pyright app external_service service utils
 
 # Build executable
 python build.py
@@ -32,19 +32,19 @@ VoiceTrans is a Windows speech-to-text tool that captures voice via Pause key an
 - `main.py` → `Application` — initializes all components and runs `root.mainloop()`
 - `app/` — Tkinter UI layer: `VoiceInputManager` orchestrates the UI; `UIQueueProcessor` handles thread-safe UI updates via a queue
 - `service/` — Business logic: `RecordingLifecycle` owns the full pipeline (record → transcribe → paste); `AudioRecorder` wraps PyAudio; `TranscriptionHandler` coordinates API calls and text transforms; `ClipboardManager` handles copy+paste; `keyboard_handler` binds Pause/F8/F9/Esc
-- `external_service/google_stt_api.py` — Google Cloud Speech-to-Text v2 wrapper; isolated here so it can be swapped without touching other layers
+- `external_service/gemini_transcribe_api.py` — Gemini `gemini-3.5-transcribe` wrapper (`client.interactions.create`); isolated here so it can be swapped without touching other layers
 - `utils/` — `AppConfig` provides type-safe access to `utils/config.ini`; `env_loader` loads `.env` credentials
 
 **Recording pipeline:**
 1. Pause key → `RecordingLifecycle.toggle_recording()`
 2. PyAudio captures PCM frames; `RecordingTimer` auto-stops at 60 s
-3. On stop: `AudioFileManager` saves WAV, `google_stt_api.transcribe_pcm()` calls the API in a background thread
+3. On stop: `AudioFileManager` saves WAV, `gemini_transcribe_api.transcribe_pcm()` calls the API in a background thread. PCM is wrapped in an in-memory WAV container and sent inline as base64 — the API rejects `audio/l16`, and inline `audio/wav` avoids the extra Files API round trip
 4. `text_transformer` applies punctuation rules and replacement dictionary (`data/replacements.txt`)
 5. `ClipboardManager.copy_and_paste()` copies result then sends Ctrl+V via pynput's keyboard controller (`paste_backend.py`)
 6. F8 key re-transcribes the last saved WAV without re-recording
 
-**Key config:** `utils/config.ini` (audio, keys, Google STT model, paths, window)  
-**Credentials:** `.env` with `GOOGLE_PROJECT_ID`, `GOOGLE_LOCATION`, `GOOGLE_CREDENTIALS_JSON`
+**Key config:** `utils/config.ini` (audio, keys, `[GEMINI]` model/language_codes/mode/custom_vocabulary_file, paths, window). `mode` is `verbatim` or `smart`; `smart` lets the model restructure text, which interferes with the F9 punctuation toggle and `replacements.txt`. Note `save_config()` rewrites config.ini via `ConfigParser.write()` on every F9 press, which strips comments — so don't put comments there.  
+**Credentials:** `.env` with `GEMINI_API_KEY`
 
 ## Coding Standards
 

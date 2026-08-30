@@ -3,7 +3,7 @@ name = "voicetrans"
 version = "1.0.0"
 requires-python = ">=3.13"
 dependencies = [
-    "google-cloud-speech==2.38.0",
+    "google-genai==2.20.0",
     "pynput==1.7.7",
     "PyAudio==0.2.14",
     "pyperclip==1.9.0",
@@ -28,7 +28,7 @@ python_files = "test_*.py"
 [tool.pyright]
 typeCheckingMode = "standard"
 pythonVersion = "3.13"
-include = ["app", "service", "utils", "tests"]
+include = ["app", "external_service", "service", "utils", "tests"]
 exclude = ["scripts"]
 reportMissingTypeStubs = false
 reportUnusedVariable = true

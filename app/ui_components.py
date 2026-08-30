@@ -162,7 +162,7 @@ class UIComponents:
         ReplacementsEditor(
             self.master,
             self.config,
-            file_path=self.config.google_stt_phrase_set_file,
+            file_path=self.config.gemini_custom_vocabulary_file,
             title='専門用語登録（1行1語）',
         )
 
