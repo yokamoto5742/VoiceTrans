@@ -28,7 +28,7 @@ def write_error_report(version: str, exc: Exception) -> None:
     """エラーレポートを出力する"""
     try:
         report = (
-            f'=== VoicePhrase エラーレポート ===\n'
+            f'=== VoiceTrans エラーレポート ===\n'
             f'バージョン: {version}\n'
             f'エラータイプ: {type(exc).__name__}\n'
             f'エラーメッセージ: {str(exc)}\n\n'

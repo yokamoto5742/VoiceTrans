@@ -14,7 +14,7 @@ def setup_logging(config=None):
     try:
         log_directory = get_config_value(config, 'LOGGING', 'log_directory', 'logs')
         log_retention_days = get_config_value(config, 'LOGGING', 'log_retention_days', 7)
-        project_name = get_config_value(config, 'LOGGING', 'project_name', 'VoicePhrase')
+        project_name = get_config_value(config, 'LOGGING', 'project_name', 'VoiceTrans')
         log_level = get_config_value(config, 'LOGGING', 'log_level', 'INFO')
 
         if not os.path.isabs(log_directory):
@@ -137,7 +137,7 @@ def get_log_info(config=None):
             project_root = os.path.dirname(os.path.dirname(__file__))
             log_directory = os.path.join(project_root, log_directory)
 
-        project_name = get_config_value(config, 'LOGGING', 'project_name', 'VoicePhrase')
+        project_name = get_config_value(config, 'LOGGING', 'project_name', 'VoiceTrans')
         log_retention_days = get_config_value(config, 'LOGGING', 'log_retention_days', 7)
         debug_mode = get_config_value(config, 'LOGGING', 'debug_mode', False)
 
