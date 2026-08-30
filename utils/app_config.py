@@ -64,7 +64,7 @@ class AppConfig:
     # --- GEMINI ---
     @property
     def gemini_model(self) -> str:
-        return get_config_value(self._config, 'GEMINI', 'MODEL', 'gemini-3.5-transcribe')
+        return get_config_value(self._config, 'GEMINI', 'MODEL', 'gemini-3.5-flash')
 
     @property
     def gemini_language_codes(self) -> list[str]:

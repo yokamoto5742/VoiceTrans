@@ -8,7 +8,7 @@ from google import genai
 
 from external_service.gemini_transcribe_api import (
     GeminiTranscribeClient,
-    _build_transcription_config,
+    _build_prompt,
     _load_custom_vocabulary,
     _pcm_to_wav,
     setup_gemini_client,
@@ -20,7 +20,7 @@ from tests.conftest import dict_to_app_config
 
 BASE_CONFIG = {
     'GEMINI': {
-        'MODEL': 'gemini-3.5-transcribe',
+        'MODEL': 'gemini-3.5-flash',
         'LANGUAGE_CODES': 'ja-JP',
         'MODE': 'verbatim',
         'CUSTOM_VOCABULARY_FILE': '',
@@ -32,12 +32,12 @@ PCM_SAMPLE = b'\x00\x01' * 800
 
 
 def make_client(
-        model: str = 'gemini-3.5-transcribe',
+        model: str = 'gemini-3.5-flash',
         language_codes: tuple[str, ...] = ('ja-JP',),
         custom_vocabulary: tuple[str, ...] = (),
         mode: str = 'verbatim',
 ) -> tuple[GeminiTranscribeClient, MagicMock]:
-    """クライアントと interactions.create のモックを返す"""
+    """クライアントと models.generate_content のモックを返す"""
     genai_client = MagicMock()
     client = GeminiTranscribeClient(
         genai_client=cast(genai.Client, genai_client),
@@ -46,14 +46,14 @@ def make_client(
         custom_vocabulary=custom_vocabulary,
         mode=mode,
     )
-    return client, genai_client.interactions.create
+    return client, genai_client.models.generate_content
 
 
 def set_output_text(create: MagicMock, text: Optional[str]) -> None:
-    """interactions.create の戻り値の output_text を差し替える"""
-    interaction = MagicMock()
-    interaction.output_text = text
-    create.return_value = interaction
+    """generate_content の戻り値の text を差し替える"""
+    response = MagicMock()
+    response.text = text
+    create.return_value = response
 
 
 class TestSetupGeminiClient:
@@ -67,7 +67,7 @@ class TestSetupGeminiClient:
         result = setup_gemini_client()
 
         mock_genai_client.assert_called_once_with(api_key='test-key')
-        assert result.model == 'gemini-3.5-transcribe'
+        assert result.model == 'gemini-3.5-flash'
         assert result.mode == 'verbatim'
         assert result.custom_vocabulary == ()
 
@@ -80,7 +80,7 @@ class TestSetupGeminiClient:
         mock_load_vocab.return_value = ('心房細動',)
         config = dict_to_app_config({
             'GEMINI': {
-                'MODEL': 'gemini-3.5-transcribe',
+                'MODEL': 'gemini-3.5-flash',
                 'LANGUAGE_CODES': 'ja-JP, en-US',
                 'MODE': 'smart',
                 'CUSTOM_VOCABULARY_FILE': 'technical_terms.txt',
@@ -156,25 +156,35 @@ class TestLoadCustomVocabulary:
             assert _load_custom_vocabulary(str(path)) == ()
 
 
-class TestBuildTranscriptionConfig:
+class TestBuildPrompt:
 
-    def test_includes_mode_only_when_others_empty(self):
-        """正常系: 言語・語彙が空ならmodeのみを含める"""
+    def test_verbatim_omits_empty_fields(self):
+        """正常系: 言語・語彙が空なら該当行を含めない"""
         client, _ = make_client(language_codes=(), custom_vocabulary=())
 
-        assert _build_transcription_config(client) == {'mode': 'verbatim'}
+        prompt = _build_prompt(client)
 
-    def test_includes_all_fields(self):
-        """正常系: 設定済みの項目をすべて含める"""
+        assert '一字一句' in prompt
+        assert '音声の言語' not in prompt
+        assert '次の用語' not in prompt
+
+    def test_smart_includes_all_fields(self):
+        """正常系: smartモードで言語とカスタム語彙を指示文に含める"""
         client, _ = make_client(
-            language_codes=('ja-JP',), custom_vocabulary=('心房細動',), mode='smart'
+            language_codes=('ja-JP', 'en-US'), custom_vocabulary=('心房細動',), mode='smart'
         )
 
-        assert _build_transcription_config(client) == {
-            'mode': 'smart',
-            'language_codes': ['ja-JP'],
-            'custom_vocabulary': ['心房細動'],
-        }
+        prompt = _build_prompt(client)
+
+        assert '読みやすく整えて' in prompt
+        assert '音声の言語: ja-JP, en-US' in prompt
+        assert '心房細動' in prompt
+
+    def test_unknown_mode_falls_back_to_verbatim(self):
+        """異常系: 未知のモードはverbatimの指示文を使う"""
+        client, _ = make_client(mode='unknown')
+
+        assert '一字一句' in _build_prompt(client)
 
 
 class TestPcmToWav:
@@ -230,8 +240,8 @@ class TestTranscribePcm:
 
         assert transcribe_pcm(b'', 16000, config, client) is None
 
-    def test_sends_wav_with_transcription_config(self):
-        """正常系: WAVに変換しtranscription_config付きで送信する"""
+    def test_sends_wav_with_prompt(self):
+        """正常系: WAVに変換し指示文付きで送信する"""
         config = dict_to_app_config(BASE_CONFIG)
         client, create = make_client(custom_vocabulary=('心房細動',))
         set_output_text(create, 'おはようございます')
@@ -240,16 +250,12 @@ class TestTranscribePcm:
 
         assert result == 'おはようございます'
         kwargs = create.call_args.kwargs
-        assert kwargs['model'] == 'gemini-3.5-transcribe'
-        assert kwargs['generation_config']['transcription_config'] == {
-            'mode': 'verbatim',
-            'language_codes': ['ja-JP'],
-            'custom_vocabulary': ['心房細動'],
-        }
-        audio = kwargs['input'][0]
-        assert audio['type'] == 'audio'
-        assert audio['mime_type'] == 'audio/wav'
-        assert audio['data'].getvalue().startswith(b'RIFF')
+        assert kwargs['model'] == 'gemini-3.5-flash'
+        audio, prompt = kwargs['contents']
+        assert audio.inline_data is not None
+        assert audio.inline_data.mime_type == 'audio/wav'
+        assert (audio.inline_data.data or b'').startswith(b'RIFF')
+        assert '心房細動' in prompt
 
     def test_empty_output_text_returns_empty_string(self):
         """正常系: 結果が空文字ならそのまま空文字を返す"""

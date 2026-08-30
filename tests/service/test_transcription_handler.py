@@ -1,3 +1,4 @@
+import time
 from unittest.mock import Mock, patch
 
 from service.audio_file_manager import AudioFileManager
@@ -9,7 +10,7 @@ from tests.conftest import dict_to_app_config
 def _make_handler(use_punctuation: bool = False, config_dict: dict | None = None):
     if config_dict is None:
         config_dict = {
-            'GEMINI': {'MODEL': 'gemini-3.5-transcribe', 'LANGUAGE_CODES': 'ja-JP'},
+            'GEMINI': {'MODEL': 'gemini-3.5-flash', 'LANGUAGE_CODES': 'ja-JP'},
             'PATHS': {'TEMP_DIR': '/test/temp'}
         }
     config = dict_to_app_config(config_dict)
@@ -20,6 +21,14 @@ def _make_handler(use_punctuation: bool = False, config_dict: dict | None = None
     ui_processor.is_shutting_down = False
     handler = TranscriptionHandler(config, client, audio_file_manager, ui_processor, use_punctuation)
     return handler, config, client, audio_file_manager, ui_processor
+
+
+def _wait_until_called(mock_obj, timeout: float = 1.0) -> bool:
+    """別スレッドで実行されるモック呼び出しの完了を待つ"""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and not mock_obj.called:
+        time.sleep(0.01)
+    return mock_obj.called
 
 
 class TestTranscriptionHandlerInit:
@@ -63,6 +72,7 @@ class TestTranscriptionHandlerTranscribeFrames:
 
         handler.transcribe_frames(frames, sample_rate, self.mock_on_complete, self.mock_on_error)
 
+        assert _wait_until_called(audio_file_manager.save_audio)
         audio_file_manager.save_audio.assert_called_once_with(frames, sample_rate)
         mock_transcribe_pcm.assert_called_once_with(
             b'audio_data_1audio_data_2', sample_rate, config, handler.client, 1
@@ -116,24 +126,6 @@ class TestTranscriptionHandlerTranscribeFrames:
         ui_processor.schedule_callback.assert_not_called()
 
     @patch('service.transcription_handler.transcribe_pcm')
-    def test_transcribe_frames_cancelled_after_save(self, mock_transcribe_pcm):
-        """異常系: 保存後にキャンセル"""
-        handler, _, _, audio_file_manager, ui_processor = _make_handler()
-
-        def cancel_on_save(*_):
-            handler.cancel_processing = True
-            return '/test/temp/audio.wav'
-
-        audio_file_manager.save_audio.side_effect = cancel_on_save
-
-        handler.transcribe_frames(
-            [b'audio_data'], 16000, self.mock_on_complete, self.mock_on_error
-        )
-
-        mock_transcribe_pcm.assert_not_called()
-        ui_processor.schedule_callback.assert_not_called()
-
-    @patch('service.transcription_handler.transcribe_pcm')
     @patch('service.transcription_handler.process_punctuation')
     def test_transcribe_frames_cancelled_before_ui_update(
         self, mock_process_punct, mock_transcribe_pcm
@@ -154,10 +146,11 @@ class TestTranscriptionHandlerTranscribeFrames:
 
         ui_processor.schedule_callback.assert_not_called()
 
-    def test_transcribe_frames_with_exception(self):
+    @patch('service.transcription_handler.transcribe_pcm')
+    def test_transcribe_frames_with_exception(self, mock_transcribe_pcm):
         """異常系: 処理中に例外発生"""
-        handler, _, _, audio_file_manager, ui_processor = _make_handler()
-        audio_file_manager.save_audio.side_effect = Exception("保存エラー")
+        handler, _, _, _, ui_processor = _make_handler()
+        mock_transcribe_pcm.side_effect = Exception("文字起こしエラー")
 
         handler.transcribe_frames(
             [b'audio_data'], 16000, self.mock_on_complete, self.mock_on_error

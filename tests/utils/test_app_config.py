@@ -132,7 +132,7 @@ class TestAppConfigGemini:
     def test_gemini_defaults(self):
         """正常系: デフォルト値"""
         config = dict_to_app_config({})
-        assert config.gemini_model == 'gemini-3.5-transcribe'
+        assert config.gemini_model == 'gemini-3.5-flash'
         assert config.gemini_language_codes == ['ja-JP']
         assert config.gemini_mode == 'verbatim'
         assert config.gemini_custom_vocabulary_file == ''

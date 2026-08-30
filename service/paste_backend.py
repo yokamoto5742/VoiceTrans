@@ -40,13 +40,7 @@ def safe_paste_text() -> bool:
     try:
         logger.debug("safe_paste_text開始")
 
-        current_text = pyperclip.paste()
-        if not current_text:
-            logger.warning("クリップボードが空です")
-            return False
-
-        time.sleep(0.05)
-
+        # クリップボードの内容は safe_clipboard_copy で検証済みのため再確認しない
         logger.debug("ctrl+v 送信前")
         with _keyboard_controller.pressed(Key.ctrl):
             _keyboard_controller.press('v')

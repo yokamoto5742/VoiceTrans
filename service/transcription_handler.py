@@ -48,12 +48,13 @@ class TranscriptionHandler:
 
             pcm_bytes = b''.join(frames)
 
-            # 保存はアーカイブ用途。失敗しても認識処理は継続
-            self.audio_file_manager.save_audio(frames, sample_rate)
-
-            if self.cancel_processing:
-                logging.info('処理がキャンセルされました')
-                return
+            # 保存はアーカイブ用途。API呼び出しを待たせないため別スレッドで実行する
+            threading.Thread(
+                target=self.audio_file_manager.save_audio,
+                args=(frames, sample_rate),
+                daemon=True,
+                name='SaveAudio-Thread'
+            ).start()
 
             logging.info('文字起こし開始')
             transcription = self.transcribe_pcm_func(

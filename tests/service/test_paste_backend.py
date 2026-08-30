@@ -265,39 +265,10 @@ class TestSafePasteText:
 
         # Assert
         assert result is True
-        mock_paste.assert_called_once()
         mock_controller.press.assert_called_once_with('v')
         mock_controller.release.assert_called_once_with('v')
-        # safe_paste_text内でsleepが2回呼ばれる: 0.05秒と0.1秒
-        assert mock_sleep.call_count == 2
-
-    @patch('service.paste_backend.pyperclip.paste')
-    def test_safe_paste_text_empty_clipboard(self, mock_paste, caplog):
-        """異常系: クリップボードが空"""
-        # Arrange
-        caplog.set_level(logging.WARNING)
-        mock_paste.return_value = ""
-
-        # Act
-        result = safe_paste_text()
-
-        # Assert
-        assert result is False
-        assert "クリップボードが空です" in caplog.text
-
-    @patch('service.paste_backend.pyperclip.paste')
-    def test_safe_paste_text_none_clipboard(self, mock_paste, caplog):
-        """異常系: クリップボードがNone"""
-        # Arrange
-        caplog.set_level(logging.WARNING)
-        mock_paste.return_value = None
-
-        # Act
-        result = safe_paste_text()
-
-        # Assert
-        assert result is False
-        assert "クリップボードが空です" in caplog.text
+        # クリップボード再確認を廃止したためsleepは送信後の0.1秒のみ
+        assert mock_sleep.call_count == 1
 
     @patch('service.paste_backend._keyboard_controller')
     @patch('service.paste_backend.pyperclip.paste')
@@ -310,20 +281,6 @@ class TestSafePasteText:
         caplog.set_level(logging.ERROR)
         mock_paste.return_value = "テストテキスト"
         mock_controller.pressed.side_effect = Exception("キーボードエラー")
-
-        # Act
-        result = safe_paste_text()
-
-        # Assert
-        assert result is False
-        assert "貼り付け操作に失敗" in caplog.text
-
-    @patch('service.paste_backend.pyperclip.paste')
-    def test_safe_paste_text_paste_exception(self, mock_paste, caplog):
-        """異常系: pyperclip.pasteで例外発生"""
-        # Arrange
-        caplog.set_level(logging.ERROR)
-        mock_paste.side_effect = Exception("クリップボード読み取りエラー")
 
         # Act
         result = safe_paste_text()
@@ -376,30 +333,6 @@ class TestSafePasteText:
         # Assert
         assert result is True
         mock_controller.press.assert_called_once_with('v')
-
-    @pytest.mark.parametrize("clipboard_content,expected", [
-        ("テスト", True),
-        ("", False),
-        (None, False),
-        ("あいうえお", True),
-        ("   ", True),
-        ("123", True),
-    ])
-    @patch('service.paste_backend._keyboard_controller')
-    @patch('service.paste_backend.pyperclip.paste')
-    @patch('service.paste_backend.time.sleep')
-    def test_safe_paste_text_parametrized(
-        self, mock_sleep, mock_paste, mock_controller, clipboard_content, expected
-    ):
-        """パラメータ化テスト: 様々なクリップボード内容"""
-        # Arrange
-        mock_paste.return_value = clipboard_content
-
-        # Act
-        result = safe_paste_text()
-
-        # Assert
-        assert result is expected
 
 
 class TestIsPasteAvailable:
@@ -572,8 +505,8 @@ class TestPerformance:
 
         # Assert
         assert result is True
-        # safe_paste_text内でsleepが2回呼ばれる: 0.05秒と0.1秒
-        assert mock_sleep.call_count == 2
+        # クリップボード再確認を廃止したためsleepは送信後の0.1秒のみ
+        assert mock_sleep.call_count == 1
         assert (end_time - start_time) < 1.0
 
 
