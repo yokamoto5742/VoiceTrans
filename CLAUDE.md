@@ -46,10 +46,13 @@ VoiceTrans は Windows 向けの音声文字起こしツールです。Pause キ
 **主な設定:** `utils/config.ini`（audio、keys、`[GEMINI]` の model/language_codes/mode/custom_vocabulary_file、paths、window）。`mode` は `verbatim` または `smart`。`smart` はモデルによるテキストの再構成を許可するため、F9 の句読点トグルや `replacements.txt` と干渉する。
 **認証情報:** `GEMINI_API_KEY` を含む `.env`
 
-## コーディング規約
+## コーディング規約・作業ルール
 
-- PEP8 + すべての関数に型ヒント
-- import 順: 標準ライブラリ → サードパーティ → ローカル（各グループ内はアルファベット順）
-- 関数は最大 50 行、単一責任
-- UI に表示する文字列は日本語とし、constants に一元化する
-- コメントは日本語で、ロジックが自明でない場合のみ
+詳細は `.claude/rules/` の各ファイルを参照し、必ず従うこと。
+
+- `.claude/rules/python-coding.md` — PEP8、型ヒント必須、import 順、クリーンコード、コメント、UI メッセージ（`constants.py` で一元管理）
+- `.claude/rules/coding-guidelines.md` — 実装前に考える／シンプルさ最優先／外科的な変更／目標駆動の実行
+- `.claude/rules/response-style.md` — パッチ差分で返す、変更範囲は最小限、修正は直接適用
+- `.claude/rules/testing.md` — テスト実行コマンド（`.venv\Scripts\python.exe -m pytest`）
+- `.claude/rules/commit.md` — コミットメッセージのプレフィックスと記述ルール
+- `.claude/rules/database.md` — マイグレーション操作（該当ファイルを扱う場合のみ）
