@@ -2,11 +2,11 @@ import glob
 import logging
 import os
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from typing import Callable, Dict, Optional
 
 from app.replacements_editor import ReplacementsEditor
-from utils.app_config import AppConfig
+from utils.app_config import GEMINI_MODES, AppConfig
 
 
 class UIComponents:
@@ -21,6 +21,9 @@ class UIComponents:
         self.callbacks = callbacks
         self._toggle_recording = callbacks.get('toggle_recording', lambda: None)
         self._toggle_punctuation = callbacks.get('toggle_punctuation', lambda: None)
+        self._change_mode = callbacks.get('change_mode', lambda mode: None)
+        self.mode_var = tk.StringVar(master=master, value=config.gemini_mode)
+        self.mode_combobox: Optional[ttk.Combobox] = None
         self.status_label: Optional[tk.Label] = None
         self.punctuation_status_label: Optional[tk.Label] = None
         self.punctuation_button: Optional[tk.Button] = None
@@ -42,6 +45,16 @@ class UIComponents:
             width=15
         )
         self.record_button.pack(pady=10)
+
+        self.mode_combobox = ttk.Combobox(
+            self.master,
+            textvariable=self.mode_var,
+            values=list(GEMINI_MODES),
+            state='readonly',
+            width=13
+        )
+        self.mode_combobox.bind('<<ComboboxSelected>>', self._on_mode_selected)
+        self.mode_combobox.pack(pady=5)
 
         self.punctuation_button = tk.Button(
             self.master,
@@ -108,6 +121,10 @@ class UIComponents:
         self.callbacks = callbacks
         self._toggle_recording = callbacks.get('toggle_recording', self._toggle_recording)
         self._toggle_punctuation = callbacks.get('toggle_punctuation', self._toggle_punctuation)
+        self._change_mode = callbacks.get('change_mode', self._change_mode)
+
+    def _on_mode_selected(self, event: tk.Event) -> None:
+        self._change_mode(self.mode_var.get())
 
     def update_record_button(self, is_recording: bool) -> None:
         assert self.record_button is not None

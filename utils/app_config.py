@@ -5,6 +5,9 @@ import sys
 
 from utils.config_manager import get_config_value
 
+# 文字起こしモードの選択肢
+GEMINI_MODES = ('verbatim', 'smart')
+
 
 class AppConfig:
     """設定ファイルへの型安全なアクセスを提供するファサード(窓口)"""
@@ -78,10 +81,14 @@ class AppConfig:
         """文字起こしモード。verbatim(発話どおり)かsmart(整形あり)"""
         raw = get_config_value(self._config, 'GEMINI', 'MODE', 'verbatim')
         mode = str(raw).strip().lower()
-        if mode not in ('verbatim', 'smart'):
+        if mode not in GEMINI_MODES:
             logging.warning(f'不正なmode設定のためverbatimを使用します: {raw}')
             return 'verbatim'
         return mode
+
+    @gemini_mode.setter
+    def gemini_mode(self, value: str) -> None:
+        self._config['GEMINI']['MODE'] = value
 
     @property
     def gemini_custom_vocabulary_file(self) -> str:

@@ -28,6 +28,7 @@ class VoiceInputManager:
         self.ui_components = UIComponents(master, config, {
             'toggle_recording': self.toggle_recording,
             'toggle_punctuation': self.toggle_punctuation,
+            'change_mode': self.change_mode,
             'reload_audio': lambda: None,
         })
         self.ui_components.setup_ui(version)
@@ -35,6 +36,7 @@ class VoiceInputManager:
         self.ui_components.update_callbacks({
             'toggle_recording': self.toggle_recording,
             'toggle_punctuation': self.toggle_punctuation,
+            'change_mode': self.change_mode,
             'reload_audio': self.ui_components.reload_latest_audio,
         })
 
@@ -67,6 +69,12 @@ class VoiceInputManager:
         logging.info(f"現在句読点: {'あり' if use_punctuation else 'なし'}")
         self.config.use_punctuation = use_punctuation
         self.config.use_comma = use_punctuation
+        save_config(self.config.raw_config)
+
+    def change_mode(self, mode: str) -> None:
+        self.recording_lifecycle.transcription_handler.set_transcription_mode(mode)
+        logging.info(f'文字起こしモード: {mode}')
+        self.config.gemini_mode = mode
         save_config(self.config.raw_config)
 
     def close_application(self) -> None:

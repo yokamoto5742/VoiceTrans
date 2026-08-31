@@ -106,6 +106,10 @@ class TranscriptionHandler:
         except Exception as e:
             on_error(str(e))
 
+    def set_transcription_mode(self, mode: str) -> None:
+        """APIクライアントの文字起こしモードを切り替える"""
+        self.client.mode = mode
+
     def wait_for_processing(self, timeout: float = 5.0) -> bool:
         """処理スレッドの完了を待機する"""
         if self.processing_thread and self.processing_thread.is_alive():
