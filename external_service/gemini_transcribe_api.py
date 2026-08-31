@@ -8,30 +8,17 @@ from typing import Optional
 
 from google import genai
 from google.genai import errors as genai_errors
-from google.genai import types
 
 from utils.app_config import AppConfig
 from utils.env_loader import load_env_variables
 
 # 録音は pyaudio.paInt16 固定のため 16bit = 2バイト
 SAMPLE_WIDTH_BYTES = 2
+DEFAULT_MODEL = 'gemini-3.5-transcribe'
+
 # カスタム語彙の上限。推奨は100語程度
 MAX_CUSTOM_VOCABULARY = 1000
 RECOMMENDED_CUSTOM_VOCABULARY = 100
-
-# 文字起こし精度を安定させるため生成のばらつきを抑える
-TEMPERATURE = 0.0
-# 書き起こしに推論は不要。レイテンシを最小化する
-THINKING_LEVEL = types.ThinkingLevel.MINIMAL
-
-MODE_INSTRUCTIONS = {
-    'verbatim': '音声を一字一句そのまま書き起こしてください。フィラーや言い直しも省略しないでください。',
-    'smart': '音声を書き起こし、意味を変えずに読みやすく整えてください。フィラーや言い直しは削除してください。',
-}
-COMMON_INSTRUCTIONS = (
-    '書き起こしたテキストのみを出力し、前置き・説明・引用符・装飾は一切付けないでください。'
-    '単語間に不要な空白を入れないでください。'
-)
 
 
 @dataclass
@@ -90,7 +77,7 @@ def setup_gemini_client(config: Optional[AppConfig] = None) -> GeminiTranscribeC
     genai_client = genai.Client(api_key=api_key)
 
     if config is None:
-        return GeminiTranscribeClient(genai_client=genai_client, model='gemini-3.5-flash')
+        return GeminiTranscribeClient(genai_client=genai_client, model=DEFAULT_MODEL)
 
     return GeminiTranscribeClient(
         genai_client=genai_client,
@@ -114,21 +101,18 @@ def validate_audio_file(file_path: str) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-def _build_prompt(client: GeminiTranscribeClient) -> str:
-    """モード・言語・カスタム語彙から文字起こし指示文を組み立てる"""
-    lines = [MODE_INSTRUCTIONS.get(client.mode, MODE_INSTRUCTIONS['verbatim'])]
+def _build_transcription_config(client: GeminiTranscribeClient) -> dict:
+    """transcription_config を組み立てる。未設定項目はキーごと省略する"""
+    transcription_config: dict = {'mode': client.mode}
     if client.language_codes:
-        lines.append(f'音声の言語: {", ".join(client.language_codes)}')
+        transcription_config['language_codes'] = list(client.language_codes)
     if client.custom_vocabulary:
-        lines.append(
-            f'次の用語が現れた場合はこの表記を使ってください: {", ".join(client.custom_vocabulary)}'
-        )
-    lines.append(COMMON_INSTRUCTIONS)
-    return '\n'.join(lines)
+        transcription_config['custom_vocabulary'] = list(client.custom_vocabulary)
+    return transcription_config
 
 
 def _pcm_to_wav(audio_bytes: bytes, sample_rate: int, channels: int) -> bytes:
-    """生PCMをメモリ上でWAVコンテナに包む。APIはaudio/l16を受け付けないため必須"""
+    """生PCMをメモリ上でWAVコンテナに包む。サンプリングレートとチャンネル数をヘッダで伝える"""
     buffer = io.BytesIO()
     with wave.open(buffer, 'wb') as wf:
         wf.setnchannels(channels)
@@ -142,19 +126,23 @@ def _transcribe_wav(wav_bytes: bytes, client: GeminiTranscribeClient) -> Optiona
     """WAVバイト列をインライン送信して文字起こしする"""
     try:
         logging.info(f'文字起こしリクエスト送信: {len(wav_bytes)} bytes (mode={client.mode})')
-        response = client.genai_client.models.generate_content(
+        interaction = client.genai_client.interactions.create(
             model=client.model,
-            contents=[
-                types.Part.from_bytes(data=wav_bytes, mime_type='audio/wav'),
-                _build_prompt(client),
+            input=[
+                {
+                    'type': 'audio',
+                    'data': io.BytesIO(wav_bytes),
+                    'mime_type': 'audio/wav',
+                }
             ],
-            config=types.GenerateContentConfig(
-                temperature=TEMPERATURE,
-                thinking_config=types.ThinkingConfig(thinking_level=THINKING_LEVEL),
-            ),
+            generation_config={
+                'transcription_config': _build_transcription_config(client),
+            },
+            store=False,
         )
 
-        text_result = (response.text or '').strip()
+        # stream未指定のためInteractionが返る(SDKの型はStreamとの共用体)
+        text_result = (getattr(interaction, 'output_text', None) or '').strip()
 
         if len(text_result) == 0:
             logging.warning('文字起こし結果が空です')

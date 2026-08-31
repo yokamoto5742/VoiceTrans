@@ -32,13 +32,13 @@ VoiceTrans is a Windows speech-to-text tool that captures voice via Pause key an
 - `main.py` → `Application` — initializes all components and runs `root.mainloop()`
 - `app/` — Tkinter UI layer: `VoiceInputManager` orchestrates the UI; `UIQueueProcessor` handles thread-safe UI updates via a queue
 - `service/` — Business logic: `RecordingLifecycle` owns the full pipeline (record → transcribe → paste); `AudioRecorder` wraps PyAudio; `TranscriptionHandler` coordinates API calls and text transforms; `ClipboardManager` handles copy+paste; `keyboard_handler` binds Pause/F8/F9/Esc
-- `external_service/gemini_transcribe_api.py` — Gemini `gemini-3.5-flash` wrapper (`client.models.generate_content`); isolated here so it can be swapped without touching other layers. The `interactions.create` endpoint with `gemini-3.5-transcribe` was dropped: measured at 3.5–4.5 s per request vs 1.1–1.4 s for `generate_content`, at equal accuracy. `mode`/`language_codes`/`custom_vocabulary` have no native parameter on this endpoint, so `_build_prompt()` expresses them as instructions
+- `external_service/gemini_transcribe_api.py` — Gemini `gemini-3.5-transcribe` wrapper (`client.interactions.create`); isolated here so it can be swapped without touching other layers. `mode`/`language_codes`/`custom_vocabulary` are native `generation_config.transcription_config` parameters on this endpoint, so no prompt text is sent. `store=False` skips server-side retention. Known cost: this endpoint measured 3.5–4.5 s per request vs 1.1–1.4 s for `generate_content` + `gemini-3.5-flash` at equal accuracy — accepted in exchange for native transcription parameters
 - `utils/` — `AppConfig` provides type-safe access to `utils/config.ini`; `env_loader` loads `.env` credentials
 
 **Recording pipeline:**
 1. Pause key → `RecordingLifecycle.toggle_recording()`
 2. PyAudio captures PCM frames; `RecordingTimer` auto-stops at 60 s
-3. On stop: `gemini_transcribe_api.transcribe_pcm()` calls the API in a background thread while `AudioFileManager` saves the WAV in a parallel thread (archive only — it must not delay the request). PCM is wrapped in an in-memory WAV container and sent inline as base64 — the API rejects `audio/l16`, and inline `audio/wav` avoids the extra Files API round trip
+3. On stop: `gemini_transcribe_api.transcribe_pcm()` calls the API in a background thread while `AudioFileManager` saves the WAV in a parallel thread (archive only — it must not delay the request). PCM is wrapped in an in-memory WAV container and sent inline as base64 — inline `audio/wav` carries sample rate and channels in its header and avoids the Files API round trip the docs' example uses
 4. `text_transformer` applies punctuation rules and replacement dictionary (`data/replacements.txt`)
 5. `ClipboardManager.copy_and_paste()` copies result then sends Ctrl+V via pynput's keyboard controller (`paste_backend.py`)
 6. F8 key re-transcribes the last saved WAV without re-recording
