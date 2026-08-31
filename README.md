@@ -88,8 +88,6 @@ VoiceTrans はこれらを次の組み合わせで解決します。
 
 医療用語や業界用語など、一般的でない固有の専門用語のみを登録してください。日常語を登録すると逆効果になります。登録は最大 1000 語ですが、100 語程度までが最も効果的です。
 
-> **旧バージョンからの移行:** Google STT 時代のクラストークン (`$OOV_CLASS_DIGIT_SEQUENCE`、`$OPERAND` など) は Gemini では機能しないため、読み込み時に自動で除外されます。
-
 ### 実装動作
 
 アプリケーション起動時に `data/technical_terms.txt` を読み込み、Gemini API へ `custom_vocabulary` として設定されます。これにより以下のような効果が期待できます。
@@ -160,7 +158,7 @@ source .venv/bin/activate
 GEMINI_API_KEY=AIza...
 ```
 
-`.env` は初回起動時に `%APPDATA%\VoiceTrans\.env` へコピーされ、以降はそちらが優先して読み込まれます。既存ユーザーがバージョンアップする場合は、`%APPDATA%\VoiceTrans\.env` を直接書き換えてください（旧 `GOOGLE_PROJECT_ID` / `GOOGLE_LOCATION` / `GOOGLE_CREDENTIALS_JSON` は不要です）。
+`.env` は初回起動時に `%APPDATA%\VoiceTrans\.env` へコピーされ、以降はそちらが優先して読み込まれます。既存ユーザーがバージョンアップする場合は、`%APPDATA%\VoiceTrans\.env` を直接書き換えてください。
 
 ### 4. 起動
 
@@ -283,7 +281,7 @@ python build.py
 ## システム要件
 
 - Windows 11
-- Python 3.12 以上
+- Python 3.13 以上
 - マイク入力デバイス
 - Gemini API キー
 
@@ -339,4 +337,3 @@ Gemini API をご利用の際は、個人を特定できる医療情報は入力
 詳細は、Google の公式サイトにてプライバシーポリシーおよび利用規約をご確認ください。
 
 <div align="right"><a href="#目次">▲ 目次へ戻る</a></div>
-"# VoiceTrans" 
