@@ -4,13 +4,14 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from utils.config_manager import get_config_path
+
 ENV_FILE_NAME = '.env'
 
 
 def _get_app_dir_name() -> str:
     config = configparser.ConfigParser()
-    config_path = Path(__file__).parent / 'config.ini'
-    with open(config_path, encoding='utf-8') as f:
+    with open(get_config_path(), encoding='utf-8') as f:
         config.read_file(f)
     return config.get('LOGGING', 'project_name')
 
