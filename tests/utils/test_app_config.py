@@ -1,6 +1,8 @@
 import os
 from unittest.mock import patch
 
+import pytest
+
 from tests.conftest import dict_to_app_config
 
 
@@ -169,6 +171,19 @@ class TestAppConfigGemini:
         """異常系: 不正なmodeはverbatimにフォールバック"""
         config = dict_to_app_config({'GEMINI': {'MODE': 'fancy'}})
         assert config.gemini_mode == 'verbatim'
+
+    def test_gemini_mode_setter_normalizes_case(self):
+        """正常系: setterは大文字や前後空白を正規化する"""
+        config = dict_to_app_config({'GEMINI': {'MODE': 'verbatim'}})
+        config.gemini_mode = ' Smart '
+        assert config.gemini_mode == 'smart'
+
+    def test_gemini_mode_setter_rejects_invalid(self):
+        """異常系: setterは不正なモードを拒否し設定を保つ"""
+        config = dict_to_app_config({'GEMINI': {'MODE': 'smart'}})
+        with pytest.raises(ValueError):
+            config.gemini_mode = 'fancy'
+        assert config.gemini_mode == 'smart'
 
     def test_gemini_custom_vocabulary_file_resolved_from_data_dir(self):
         """正常系: 相対パスはdataディレクトリから解決"""

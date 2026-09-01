@@ -50,7 +50,7 @@ VoiceTrans は Windows 向けの音声文字起こしツールです。Pause キ
 
 詳細は `.claude/rules/` の各ファイルを参照し、必ず従うこと。
 
-- `.claude/rules/python-coding.md` — PEP8、型ヒント必須、import 順、クリーンコード、コメント、UI メッセージ（`constants.py` で一元管理）
+- `.claude/rules/python-coding.md` — PEP8、型ヒント必須、import 順、クリーンコード、コメント、UI メッセージ
 - `.claude/rules/coding-guidelines.md` — 実装前に考える／シンプルさ最優先／外科的な変更／目標駆動の実行
 - `.claude/rules/response-style.md` — パッチ差分で返す、変更範囲は最小限、修正は直接適用
 - `.claude/rules/testing.md` — テスト実行コマンド（`.venv\Scripts\python.exe -m pytest`）

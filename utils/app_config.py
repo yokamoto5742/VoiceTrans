@@ -7,6 +7,8 @@ from utils.config_manager import get_config_value
 
 # 文字起こしモードの選択肢
 GEMINI_MODES = ('verbatim', 'smart')
+DEFAULT_GEMINI_MODE = GEMINI_MODES[0]
+DEFAULT_GEMINI_MODEL = 'gemini-3.5-transcribe'
 
 
 class AppConfig:
@@ -67,7 +69,7 @@ class AppConfig:
     # --- GEMINI ---
     @property
     def gemini_model(self) -> str:
-        return get_config_value(self._config, 'GEMINI', 'MODEL', 'gemini-3.5-transcribe')
+        return get_config_value(self._config, 'GEMINI', 'MODEL', DEFAULT_GEMINI_MODEL)
 
     @property
     def gemini_language_codes(self) -> list[str]:
@@ -79,16 +81,19 @@ class AppConfig:
     @property
     def gemini_mode(self) -> str:
         """文字起こしモード。verbatim(発話どおり)かsmart(整形あり)"""
-        raw = get_config_value(self._config, 'GEMINI', 'MODE', 'verbatim')
+        raw = get_config_value(self._config, 'GEMINI', 'MODE', DEFAULT_GEMINI_MODE)
         mode = str(raw).strip().lower()
         if mode not in GEMINI_MODES:
-            logging.warning(f'不正なmode設定のためverbatimを使用します: {raw}')
-            return 'verbatim'
+            logging.warning(f'不正なmode設定のため{DEFAULT_GEMINI_MODE}を使用します: {raw}')
+            return DEFAULT_GEMINI_MODE
         return mode
 
     @gemini_mode.setter
     def gemini_mode(self, value: str) -> None:
-        self._config['GEMINI']['MODE'] = value
+        mode = str(value).strip().lower()
+        if mode not in GEMINI_MODES:
+            raise ValueError(f'不正な文字起こしモードです: {value}')
+        self._config['GEMINI']['MODE'] = mode
 
     @property
     def gemini_custom_vocabulary_file(self) -> str:

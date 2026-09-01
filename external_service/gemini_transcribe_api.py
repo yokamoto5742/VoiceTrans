@@ -9,12 +9,11 @@ from typing import Optional
 from google import genai
 from google.genai import errors as genai_errors
 
-from utils.app_config import AppConfig
+from utils.app_config import DEFAULT_GEMINI_MODE, DEFAULT_GEMINI_MODEL, AppConfig
 from utils.env_loader import load_env_variables
 
 # 録音は pyaudio.paInt16 固定のため 16bit = 2バイト
 SAMPLE_WIDTH_BYTES = 2
-DEFAULT_MODEL = 'gemini-3.5-transcribe'
 
 # カスタム語彙の上限。推奨は100語程度
 MAX_CUSTOM_VOCABULARY = 1000
@@ -27,7 +26,7 @@ class GeminiTranscribeClient:
     model: str
     language_codes: tuple[str, ...] = field(default_factory=tuple)
     custom_vocabulary: tuple[str, ...] = field(default_factory=tuple)
-    mode: str = 'verbatim'
+    mode: str = DEFAULT_GEMINI_MODE
 
 
 def _load_custom_vocabulary(file_path: str) -> tuple[str, ...]:
@@ -77,7 +76,7 @@ def setup_gemini_client(config: Optional[AppConfig] = None) -> GeminiTranscribeC
     genai_client = genai.Client(api_key=api_key)
 
     if config is None:
-        return GeminiTranscribeClient(genai_client=genai_client, model=DEFAULT_MODEL)
+        return GeminiTranscribeClient(genai_client=genai_client, model=DEFAULT_GEMINI_MODEL)
 
     return GeminiTranscribeClient(
         genai_client=genai_client,
