@@ -4,7 +4,12 @@ from unittest.mock import Mock, mock_open, patch
 
 import pytest
 
-from service.text_transformer import load_replacements, process_punctuation, replace_text
+from service.text_transformer import (
+    load_replacements,
+    process_punctuation,
+    remove_ja_spaces,
+    replace_text,
+)
 
 
 class TestProcessPunctuation:
@@ -188,6 +193,31 @@ class TestReplaceText:
     def test_replace_text_parametrized(self, text, replacements, expected):
         """パラメータ化テスト"""
         assert replace_text(text, replacements) == expected
+
+
+class TestRemoveJaSpaces:
+    """日本語の空白除去のテストクラス"""
+
+    def test_remove_spaces_between_japanese(self):
+        """正常系: 文節単位で入った空白と句読点前後の空白を除去"""
+        result = remove_ja_spaces("この2つのメリット 、 デメリット を 教え て ください 。")
+        assert result == "この2つのメリット、デメリットを教えてください。"
+
+    def test_remove_full_width_spaces(self):
+        """正常系: 全角スペースも除去"""
+        assert remove_ja_spaces("これ　は　テスト") == "これはテスト"
+
+    def test_remove_spaces_between_japanese_and_alnum(self):
+        """正常系: 日本語と英数字の間の空白を除去"""
+        assert remove_ja_spaces("結果 は 100 点 です") == "結果は100点です"
+
+    def test_keep_spaces_between_ascii_words(self):
+        """正常系: 英数字同士の空白は保持"""
+        assert remove_ja_spaces("Windows 11 で動作") == "Windows 11で動作"
+
+    def test_empty_text(self):
+        """境界値: 空文字はそのまま返す"""
+        assert remove_ja_spaces("") == ""
 
 
 class TestReplaceTextPerformance:

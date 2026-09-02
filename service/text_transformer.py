@@ -2,6 +2,9 @@ import logging
 import re
 from typing import Dict
 
+# 日本語とみなす文字範囲: CJK記号・句読点、かな、漢字、全角英数記号
+_JA_CHARS = r'、-〿぀-ヿ一-鿿＀-￯'
+
 
 def process_punctuation(text: str, use_punctuation: bool) -> str:
     """句読点の有無に応じてテキストを処理する"""
@@ -48,10 +51,15 @@ def load_replacements(replacements_path: str) -> Dict[str, str]:
     return replacements
 
 
-def remove_ja_en_spaces(text: str) -> str:
-    """日本語文字と英数字の間の半角スペースを除去する"""
-    text = re.sub(r'([぀-鿿＀-￯])\s+([A-Za-z0-9])', r'\1\2', text)
-    text = re.sub(r'([A-Za-z0-9])\s+([぀-鿿＀-￯])', r'\1\2', text)
+def remove_ja_spaces(text: str) -> str:
+    """日本語文字の前後に入った空白を除去する
+
+    Geminiのverbatim出力は「教え て ください 。」のように文節単位で空白が入るため、
+    日本語同士および日本語と英数字の間の空白を取り除く。
+    連続する空白区切りを1回の走査で処理できるよう、後方は先読みで判定する。
+    """
+    text = re.sub(rf'([{_JA_CHARS}])[ 　]+(?=[{_JA_CHARS}A-Za-z0-9])', r'\1', text)
+    text = re.sub(rf'([A-Za-z0-9])[ 　]+(?=[{_JA_CHARS}])', r'\1', text)
     return text
 
 
