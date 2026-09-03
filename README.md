@@ -201,7 +201,7 @@ python main.py
 ### レイヤー構成
 
 - **`app/`** — Tkinter UI レイヤー。`VoiceInputManager` がメインウィンドウを保持。全 UI 更新は `UIQueueProcessor` 経由
-- **`service/`** — ビジネスロジック。`RecordingLifecycle` が `AudioRecorder` → `AudioFileManager` → `TranscriptionHandler` → `TextTransformer` → `ClipboardManager` → `paste_backend` のパイプラインを統合
+- **`service/`** — ビジネスロジック。`RecordingLifecycle` が `AudioRecorder` → `AudioFileManager` → `TranscriptionHandler`（置換辞書と句読点処理を統合）→ `ClipboardManager` → `paste_backend` のパイプラインを統合
 - **`external_service/`** — Gemini API の薄いラッパー
 - **`utils/`** — 設定 (`AppConfig`)、ロギング、クラッシュログ、シグナル設定
 
