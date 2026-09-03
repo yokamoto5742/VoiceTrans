@@ -1,21 +1,18 @@
 import logging
 import threading
 import time
-from typing import Dict
 
 import pyperclip
 
 from service.paste_backend import is_paste_available, safe_clipboard_copy, safe_paste_text
-from service.text_transformer import remove_ja_spaces, replace_text
 from utils.app_config import AppConfig
 
 
 class ClipboardManager:
     """クリップボード操作とペースト処理を管理する"""
 
-    def __init__(self, config: AppConfig, replacements: Dict[str, str]):
+    def __init__(self, config: AppConfig):
         self._config = config
-        self._replacements = replacements
         self._clipboard_lock = threading.Lock()
 
     def initialize(self) -> bool:
@@ -34,7 +31,7 @@ class ClipboardManager:
             return False
 
     def copy_and_paste(self, text: str) -> None:
-        """テキストを置換してクリップボードにコピーしバックグラウンドでペーストする"""
+        """テキストをクリップボードにコピーしバックグラウンドでペーストする"""
         if not text:
             logging.warning('空のテキスト')
             return
@@ -48,18 +45,12 @@ class ClipboardManager:
         thread.start()
 
     def _paste_in_thread(self, text: str) -> None:
-        """バックグラウンドスレッドで置換→クリップボードコピー→ペーストを実行"""
+        """バックグラウンドスレッドでクリップボードコピー→ペーストを実行"""
         try:
             logging.debug('_paste_in_thread開始')
 
-            # 空白除去を先に実行し、置換辞書のキーが空白で分断されないようにする
-            replaced_text = replace_text(remove_ja_spaces(text), self._replacements)
-            if not replaced_text:
-                logging.error('テキスト置換結果が空です')
-                return
-
             logging.debug('クリップボードへコピー開始')
-            if not safe_clipboard_copy(replaced_text):
+            if not safe_clipboard_copy(text):
                 raise Exception('クリップボードへのコピーに失敗しました')
             logging.debug('クリップボードへコピー完了')
 

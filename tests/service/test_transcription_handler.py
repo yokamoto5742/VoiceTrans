@@ -7,7 +7,11 @@ from app.ui_queue_processor import UIQueueProcessor
 from tests.conftest import dict_to_app_config
 
 
-def _make_handler(use_punctuation: bool = False, config_dict: dict | None = None):
+def _make_handler(
+    use_punctuation: bool = False,
+    config_dict: dict | None = None,
+    replacements: dict | None = None,
+):
     if config_dict is None:
         config_dict = {
             'GEMINI': {'MODEL': 'gemini-3.5-transcribe', 'LANGUAGE_CODES': 'ja-JP'},
@@ -19,7 +23,9 @@ def _make_handler(use_punctuation: bool = False, config_dict: dict | None = None
     ui_processor = Mock(spec=UIQueueProcessor)
     ui_processor.is_ui_valid.return_value = True
     ui_processor.is_shutting_down = False
-    handler = TranscriptionHandler(config, client, audio_file_manager, ui_processor, use_punctuation)
+    handler = TranscriptionHandler(
+        config, client, audio_file_manager, ui_processor, use_punctuation, replacements or {}
+    )
     return handler, config, client, audio_file_manager, ui_processor
 
 
@@ -265,3 +271,44 @@ class TestTranscriptionHandlerCancelAndReset:
         handler.cancel_processing = True
         handler.reset_cancel()
         assert handler.cancel_processing is False
+
+
+class TestTranscriptionHandlerTransformText:
+    """TranscriptionHandlerのtransform_text()のテストクラス"""
+
+    def test_transform_applies_replacements(self):
+        """正常系: 空白除去後に置換辞書が適用される"""
+        handler, *_ = _make_handler(use_punctuation=True, replacements={'ＡＢＣ': 'ABC'})
+
+        assert handler.transform_text('ＡＢＣ 検査 です。') == 'ABC検査です。'
+
+    def test_transform_runs_punctuation_after_replacement(self):
+        """回帰: 句読点なし設定を '？'→'。' の置換が打ち消さない"""
+        handler, *_ = _make_handler(use_punctuation=False, replacements={'？': '。'})
+
+        assert handler.transform_text('これは検査ですか？はい、そうです。') == 'これは検査ですかはいそうです'
+
+    def test_transform_keeps_replaced_punctuation_when_enabled(self):
+        """正常系: 句読点ありなら置換で生成された句点は残る"""
+        handler, *_ = _make_handler(use_punctuation=True, replacements={'？': '。'})
+
+        assert handler.transform_text('これは検査ですか？') == 'これは検査ですか。'
+
+
+class TestTranscriptionHandlerReloadReplacements:
+    """TranscriptionHandlerのreload_replacements()のテストクラス"""
+
+    def test_reload_replacements_reads_updated_file(self, tmp_path):
+        """正常系: 保存後のファイル内容が再起動なしで反映される"""
+        replacements_file = tmp_path / 'replacements.txt'
+        replacements_file.write_text('旧,古い\n', encoding='utf-8')
+        config_dict = {
+            'GEMINI': {'MODEL': 'gemini-3.5-transcribe', 'LANGUAGE_CODES': 'ja-JP'},
+            'PATHS': {'TEMP_DIR': '/test/temp', 'REPLACEMENTS_FILE': str(replacements_file)}
+        }
+        handler, *_ = _make_handler(config_dict=config_dict, replacements={'旧': '古い'})
+
+        replacements_file.write_text('新,あたらしい\n', encoding='utf-8')
+        handler.reload_replacements()
+
+        assert handler.replacements == {'新': 'あたらしい'}

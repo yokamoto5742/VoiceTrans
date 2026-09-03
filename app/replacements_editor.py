@@ -2,7 +2,7 @@ import logging
 import os
 import tkinter as tk
 from tkinter import messagebox, ttk
-from typing import Optional
+from typing import Callable, Optional
 
 from utils.app_config import AppConfig
 
@@ -14,9 +14,11 @@ class ReplacementsEditor:
             config: AppConfig,
             file_path: Optional[str] = None,
             title: Optional[str] = None,
+            on_saved: Optional[Callable[[], None]] = None,
     ):
         self.config = config
         self._file_path = file_path or config.replacements_file
+        self._on_saved = on_saved
         self.window = tk.Toplevel(parent)
         self.window.title(title or '置換辞書登録( 置換前 , 置換後 )')
         self.window.geometry(f'{config.editor_width}x{config.editor_height}')
@@ -72,6 +74,9 @@ class ReplacementsEditor:
             content = self.text_area.get('1.0', 'end-1c')
             with open(self._file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
+
+            if self._on_saved:
+                self._on_saved()
 
             messagebox.showinfo('保存完了', 'ファイルを保存しました')
             self.window.destroy()

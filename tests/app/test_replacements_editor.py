@@ -275,6 +275,59 @@ class TestSaveFile:
     @patch('app.replacements_editor.tk.Toplevel')
     @patch('app.replacements_editor.tk.Text')
     @patch('app.replacements_editor.os.path.exists')
+    @patch('app.replacements_editor.os.path.dirname')
+    @patch('app.replacements_editor.messagebox.showinfo', new=Mock())
+    def test_save_file_calls_on_saved(
+        self, mock_dirname, mock_exists, mock_text, mock_toplevel
+    ):
+        """正常系: 保存成功時にon_savedコールバックが呼ばれる"""
+        mock_toplevel.return_value = Mock()
+        mock_text_widget = create_mock_text_widget()
+        mock_text_widget.get.return_value = "置換前,置換後"
+        mock_text.return_value = mock_text_widget
+        mock_exists.return_value = True
+        mock_dirname.return_value = 'C:/test'
+        on_saved = Mock()
+
+        with patch('builtins.open', mock_open()), \
+             patch('app.replacements_editor.os.makedirs'):
+            editor = ReplacementsEditor(
+                self.mock_parent, dict_to_app_config(self.mock_config), on_saved=on_saved
+            )
+            editor.save_file()
+
+        on_saved.assert_called_once_with()
+
+    @patch('app.replacements_editor.tk.Toplevel')
+    @patch('app.replacements_editor.tk.Text')
+    @patch('app.replacements_editor.os.path.exists')
+    @patch('app.replacements_editor.os.path.dirname')
+    @patch('app.replacements_editor.messagebox.showerror', new=Mock())
+    def test_save_file_skips_on_saved_on_error(
+        self, mock_dirname, mock_exists, mock_text, mock_toplevel
+    ):
+        """異常系: 保存失敗時はon_savedを呼ばない"""
+        mock_toplevel.return_value = Mock()
+        mock_text_widget = create_mock_text_widget()
+        mock_text_widget.get.return_value = "置換前,置換後"
+        mock_text.return_value = mock_text_widget
+        mock_exists.return_value = True
+        mock_dirname.return_value = 'C:/test'
+        on_saved = Mock()
+
+        with patch('builtins.open', mock_open()) as mocked_open, \
+             patch('app.replacements_editor.os.makedirs'):
+            editor = ReplacementsEditor(
+                self.mock_parent, dict_to_app_config(self.mock_config), on_saved=on_saved
+            )
+            mocked_open.side_effect = IOError('書き込み失敗')
+            editor.save_file()
+
+        on_saved.assert_not_called()
+
+    @patch('app.replacements_editor.tk.Toplevel')
+    @patch('app.replacements_editor.tk.Text')
+    @patch('app.replacements_editor.os.path.exists')
     @patch('app.replacements_editor.os.makedirs')
     @patch('app.replacements_editor.os.path.dirname')
     def test_save_file_creates_directory(

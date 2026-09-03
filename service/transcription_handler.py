@@ -1,12 +1,17 @@
 import logging
 import threading
 import traceback
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from app.ui_queue_processor import UIQueueProcessor
 from external_service.gemini_transcribe_api import transcribe_audio, transcribe_pcm
 from service.audio_file_manager import AudioFileManager
-from service.text_transformer import process_punctuation
+from service.text_transformer import (
+    load_replacements,
+    process_punctuation,
+    remove_ja_spaces,
+    replace_text,
+)
 from utils.app_config import AppConfig
 
 
@@ -18,13 +23,15 @@ class TranscriptionHandler:
             client: Any,
             audio_file_manager: AudioFileManager,
             ui_processor: UIQueueProcessor,
-            use_punctuation: bool
+            use_punctuation: bool,
+            replacements: Dict[str, str]
     ):
         self.config = config
         self.client = client
         self.audio_file_manager = audio_file_manager
         self.ui_processor = ui_processor
         self.use_punctuation = use_punctuation
+        self.replacements = replacements
 
         self.cancel_processing = False
         self.processing_thread: Optional[threading.Thread] = None
@@ -68,9 +75,9 @@ class TranscriptionHandler:
             if not transcription:
                 raise ValueError('音声ファイルの文字起こしに失敗しました')
 
-            logging.debug(f'句読点処理開始: use_punctuation={self.use_punctuation}')
-            transcription = process_punctuation(transcription, self.use_punctuation)
-            logging.debug('句読点処理完了')
+            logging.debug(f'テキスト整形開始: use_punctuation={self.use_punctuation}')
+            transcription = self.transform_text(transcription)
+            logging.debug('テキスト整形完了')
 
             if self.cancel_processing:
                 logging.info('処理がキャンセルされました')
@@ -99,12 +106,25 @@ class TranscriptionHandler:
                 self.client
             )
             if transcription:
-                transcription = process_punctuation(transcription, self.use_punctuation)
+                transcription = self.transform_text(transcription)
                 on_complete(transcription)
             else:
                 raise ValueError('音声ファイルの処理に失敗しました')
         except Exception as e:
             on_error(str(e))
+
+    def transform_text(self, text: str) -> str:
+        """空白除去→置換→句読点処理の順にテキストを整形する
+
+        句読点処理を最後に置くことで、置換ルール（例: '？'→'。'）が
+        句読点なし設定を打ち消さないようにする
+        """
+        replaced = replace_text(remove_ja_spaces(text), self.replacements)
+        return process_punctuation(replaced, self.use_punctuation)
+
+    def reload_replacements(self) -> None:
+        """置換辞書ファイルを再読み込みする"""
+        self.replacements = load_replacements(self.config.replacements_file)
 
     def set_transcription_mode(self, mode: str) -> None:
         """APIクライアントの文字起こしモードを切り替える"""

@@ -34,7 +34,7 @@ class Application:
         logging.info('Gemini Transcribe APIクライアントを初期化しました')
 
         replacements = load_replacements(config.replacements_file)
-        clipboard_manager = ClipboardManager(config, replacements)
+        clipboard_manager = ClipboardManager(config)
         clipboard_manager.initialize()
 
         audio_file_manager = AudioFileManager(config)
@@ -46,7 +46,8 @@ class Application:
         notification_manager = NotificationManager(root, config)
 
         transcription_handler = TranscriptionHandler(
-            config, client, audio_file_manager, ui_processor, config.use_punctuation
+            config, client, audio_file_manager, ui_processor,
+            config.use_punctuation, replacements
         )
 
         recording_lifecycle = RecordingLifecycle(

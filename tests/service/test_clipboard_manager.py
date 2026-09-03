@@ -5,9 +5,9 @@ from service.clipboard_manager import ClipboardManager
 from tests.conftest import dict_to_app_config
 
 
-def _make_manager(replacements: dict | None = None, paste_delay: float = 0.1):
+def _make_manager(paste_delay: float = 0.1):
     config = dict_to_app_config({'CLIPBOARD': {'PASTE_DELAY': str(paste_delay)}})
-    return ClipboardManager(config, replacements or {})
+    return ClipboardManager(config)
 
 
 class TestClipboardManagerInitialize:
@@ -81,7 +81,7 @@ class TestClipboardManagerCopyAndPaste:
         mock_thread = Mock()
         mock_thread_class.return_value = mock_thread
 
-        manager = _make_manager({"テスト": "試験"})
+        manager = _make_manager()
         manager.copy_and_paste("テスト文字列")
 
         mock_thread_class.assert_called_once()
@@ -95,30 +95,25 @@ class TestClipboardManagerCopyAndPaste:
             _make_manager().copy_and_paste("")
             mock_thread_class.assert_not_called()
 
-    @patch('service.clipboard_manager.replace_text')
     @patch('service.clipboard_manager.safe_clipboard_copy')
     @patch('service.clipboard_manager.safe_paste_text')
     @patch('service.clipboard_manager.time.sleep')
-    def test_paste_in_thread_success(self, mock_sleep, mock_paste, mock_copy, mock_replace):
-        """正常系: スレッド内の処理が成功"""
-        mock_replace.return_value = "試験文字列"
+    def test_paste_in_thread_success(self, mock_sleep, mock_paste, mock_copy):
+        """正常系: 受け取ったテキストをそのままコピーしてペーストする"""
         mock_copy.return_value = True
         mock_paste.return_value = True
 
-        manager = _make_manager({"テスト": "試験"})
-        manager._paste_in_thread("テスト文字列")
+        manager = _make_manager()
+        manager._paste_in_thread("試験文字列")
 
-        mock_replace.assert_called_once_with("テスト文字列", {"テスト": "試験"})
         mock_copy.assert_called_once_with("試験文字列")
         mock_sleep.assert_called_once_with(0.1)
         mock_paste.assert_called_once()
 
-    @patch('service.clipboard_manager.replace_text')
     @patch('service.clipboard_manager.safe_clipboard_copy')
-    def test_paste_in_thread_copy_failure(self, mock_copy, mock_replace, caplog):
+    def test_paste_in_thread_copy_failure(self, mock_copy, caplog):
         """異常系: クリップボードコピー失敗"""
         caplog.set_level(logging.ERROR)
-        mock_replace.return_value = "置換後テキスト"
         mock_copy.return_value = False
 
         manager = _make_manager()
@@ -126,16 +121,12 @@ class TestClipboardManagerCopyAndPaste:
 
         assert "_paste_in_thread中にエラー" in caplog.text
 
-    @patch('service.clipboard_manager.replace_text')
     @patch('service.clipboard_manager.safe_clipboard_copy')
     @patch('service.clipboard_manager.safe_paste_text')
     @patch('service.clipboard_manager.time.sleep', new=Mock())
-    def test_paste_in_thread_paste_failure_logs_error(
-        self, mock_paste, mock_copy, mock_replace, caplog
-    ):
+    def test_paste_in_thread_paste_failure_logs_error(self, mock_paste, mock_copy, caplog):
         """異常系: ペースト実行失敗時にエラーログが出力される"""
         caplog.set_level(logging.ERROR)
-        mock_replace.return_value = "置換後テキスト"
         mock_copy.return_value = True
         mock_paste.return_value = False  # ペースト失敗
 
@@ -143,17 +134,6 @@ class TestClipboardManagerCopyAndPaste:
         manager._paste_in_thread("テスト")
 
         assert "貼り付け実行に失敗しました" in caplog.text
-
-    @patch('service.clipboard_manager.replace_text')
-    def test_paste_in_thread_empty_replaced_text(self, mock_replace, caplog):
-        """境界値: 置換結果が空文字列"""
-        caplog.set_level(logging.ERROR)
-        mock_replace.return_value = ""
-
-        manager = _make_manager()
-        manager._paste_in_thread("テスト")
-
-        assert "テキスト置換結果が空です" in caplog.text
 
 
 class TestClipboardManagerEmergencyRecovery:

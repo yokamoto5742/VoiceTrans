@@ -29,6 +29,7 @@ class VoiceInputManager:
             'toggle_recording': self.toggle_recording,
             'toggle_punctuation': self.toggle_punctuation,
             'change_mode': self.change_mode,
+            'reload_replacements': self.reload_replacements,
             'reload_audio': lambda: None,
         })
         self.ui_components.setup_ui(version)
@@ -37,6 +38,7 @@ class VoiceInputManager:
             'toggle_recording': self.toggle_recording,
             'toggle_punctuation': self.toggle_punctuation,
             'change_mode': self.change_mode,
+            'reload_replacements': self.reload_replacements,
             'reload_audio': self.ui_components.reload_latest_audio,
         })
 
@@ -70,6 +72,11 @@ class VoiceInputManager:
         self.config.use_punctuation = use_punctuation
         self.config.use_comma = use_punctuation
         save_config(self.config.raw_config)
+
+    def reload_replacements(self) -> None:
+        """置換辞書の編集内容を再起動なしで反映する"""
+        self.recording_lifecycle.transcription_handler.reload_replacements()
+        logging.info('置換辞書を再読み込みしました')
 
     def change_mode(self, mode: str) -> None:
         self.recording_lifecycle.transcription_handler.set_transcription_mode(mode)

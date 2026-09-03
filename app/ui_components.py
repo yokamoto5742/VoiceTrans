@@ -22,6 +22,7 @@ class UIComponents:
         self._toggle_recording = callbacks.get('toggle_recording', lambda: None)
         self._toggle_punctuation = callbacks.get('toggle_punctuation', lambda: None)
         self._change_mode = callbacks.get('change_mode', lambda mode: None)
+        self._reload_replacements = callbacks.get('reload_replacements', lambda: None)
         self.mode_var = tk.StringVar(master=master, value=config.gemini_mode)
         self.mode_combobox: Optional[ttk.Combobox] = None
         self.status_label: Optional[tk.Label] = None
@@ -122,6 +123,9 @@ class UIComponents:
         self._toggle_recording = callbacks.get('toggle_recording', self._toggle_recording)
         self._toggle_punctuation = callbacks.get('toggle_punctuation', self._toggle_punctuation)
         self._change_mode = callbacks.get('change_mode', self._change_mode)
+        self._reload_replacements = callbacks.get(
+            'reload_replacements', self._reload_replacements
+        )
 
     def _on_mode_selected(self, event: tk.Event) -> None:
         self._change_mode(self.mode_var.get())
@@ -173,7 +177,7 @@ class UIComponents:
             self.master.event_generate('<<LoadAudioFile>>')
 
     def open_replacements_editor(self) -> None:
-        ReplacementsEditor(self.master, self.config)
+        ReplacementsEditor(self.master, self.config, on_saved=self._reload_replacements)
 
     def open_technical_terms_editor(self) -> None:
         ReplacementsEditor(
